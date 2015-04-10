@@ -66,7 +66,6 @@ class CoursewareSearchIndexer(object):
 
             if groups_usage_info:
                 item.content_groups = []
-
                 for name, group in groups_usage_info:
                     for module in group:
                         if str(item_location) == str(module['usage_key_string']):
@@ -78,7 +77,6 @@ class CoursewareSearchIndexer(object):
             item = _fetch_item(item_location)
             if not item:
                 return
-
             if content_groups and not getattr(item, 'content_groups', None):
                 item.content_groups = content_groups
 
@@ -93,7 +91,10 @@ class CoursewareSearchIndexer(object):
 
             if item.has_children:
                 for child_loc in item.children:
-                    index_item_location(child_loc, current_start_date, item.content_groups)
+                    if getattr(item, 'content_groups', None):
+                        index_item_location(child_loc, current_start_date, item.content_groups)
+                    else:
+                        index_item_location(child_loc, current_start_date)
 
             item_index = {}
             item_index_dictionary = item.index_dictionary() if is_indexable else None
@@ -153,7 +154,7 @@ class CoursewareSearchIndexer(object):
         return indexed_count
 
     @classmethod
-    def do_course_reindex(cls, modulestore, course_key, groups_usage_info):
+    def do_course_reindex(cls, modulestore, course_key, groups_usage_info=None):
         """
         (Re)index all content within the given course
         """

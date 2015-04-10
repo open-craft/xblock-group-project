@@ -22,6 +22,7 @@ from ...fixtures import LMS_BASE_URL
 from ...pages.studio.component_editor import ComponentVisibilityEditorView
 from ...pages.lms.instructor_dashboard import InstructorDashboardPage
 from ...pages.lms.courseware import CoursewarePage
+from ...pages.lms.course_nav import CourseNavPage
 from ...pages.lms.auto_auth import AutoAuthPage as LmsAutoAuthPage
 from ...tests.lms.test_lms_user_preview import verify_expected_problem_visibility
 
@@ -254,18 +255,15 @@ class CoursewareSearchCohortTest(ContainerBase):
         View content as staff, student in Cohort A, student in Cohort B, and student in Default Cohort.
         """
         courseware_page = CoursewarePage(self.browser, self.course_id)
+        coursenav_page = CourseNavPage(self.browser)
 
         def login_and_verify_visible_problems(username, email, expected_problems):
             LmsAutoAuthPage(
                 self.browser, username=username, email=email, course_id=self.course_id
             ).visit()
             courseware_page.visit()
+            coursenav_page.go_to_section('Test Section', 'Test Subsection')
             verify_expected_problem_visibility(self, courseware_page, expected_problems)
-
-        login_and_verify_visible_problems(
-            self.staff_user["username"], self.staff_user["email"],
-            [self.group_a_problem, self.group_b_problem, self.group_a_and_b_problem, self.visible_to_all_problem]
-        )
 
         login_and_verify_visible_problems(
             self.cohort_a_student_username, self.cohort_a_student_email,
@@ -299,19 +297,22 @@ class CoursewareSearchCohortTest(ContainerBase):
         # Publish in studio to trigger indexing.
         self._auto_auth(self.STAFF_USERNAME, self.STAFF_EMAIL, True)
         self._studio_publish_content(0)
-        self.browser.save_screenshot('test_shot.jpg')
 
         # Do the search again, this time we expect results.
         self._auto_auth(self.USERNAME, self.EMAIL, False)
         self.courseware_search_page.visit()
-        self.browser.save_screenshot('test_shot2.jpg')
-        self.courseware_search_page.search_for_term(self.SEARCH_STRING)
-        self.browser.save_screenshot('test_shot3.jpg')
-        assert self.SEARCH_STRING in self.courseware_search_page.search_results.html[0]
+        self.courseware_search_page.search_for_term(self.group_a_problem)
+        assert self.group_a_problem in self.courseware_search_page.search_results.html[0]
 
         # Enable Cohorting
+        self._auto_auth(self.STAFF_USERNAME, self.STAFF_EMAIL, True)
         self.enable_cohorting(self.course_fixture)
         self.create_content_groups()
         self.link_problems_to_content_groups_and_publish()
         self.create_cohorts_and_assign_students()
         self.view_cohorted_content_as_different_users()
+
+        self._auto_auth(self.cohort_a_student_username, self.cohort_a_student_email, False)
+        self.courseware_search_page.visit()
+        self.courseware_search_page.search_for_term(self.group_a_problem)
+        assert self.group_a_problem in self.courseware_search_page.search_results.html[0]
