@@ -457,3 +457,9 @@ class ProjectAPI(object):
         )
 
         return json.loads(response.read())
+
+
+class AlternativeProjectAPI(ProjectAPI):
+    def __init__(self, address):
+        super(AlternativeProjectAPI, self).__init__(address)
+        raise Exception("QWE")

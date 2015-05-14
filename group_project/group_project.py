@@ -2,7 +2,7 @@
 #
 
 # Imports ###########################################################
-
+import importlib
 import logging
 import textwrap
 import json
@@ -115,6 +115,7 @@ class GroupProjectBlock(XBlock):
     has_score = True
 
     _project_api = None
+    _default_project_api_location = 'group_project.project_api.ProjectAPI'
 
     def _confirm_outsider_allowed(self):
         granted_roles = [r["role"] for r in self.project_api.get_user_roles_for_course(self.user_id, self.course_id)]
@@ -136,15 +137,30 @@ class GroupProjectBlock(XBlock):
         group_activity = GroupActivity.import_xml_string(self.data, self.is_admin_grader)
         return group_activity.milestone_dates
 
+    def _get_project_api_implementation(self):
+        location = getattr(settings, 'GROUP_PROJECT_API_LOCATION', self._default_project_api_location)
+
+        split = location.split('.')
+        project_api_module, project_api_classname = ".".join(split[:-1]), split[-1]
+
+        if not split[0]:
+            raise ImproperlyConfigured("GroupProjectAPI implementation does not support relative imports")
+
+        module = importlib.import_module(project_api_module)
+        return getattr(module, project_api_classname)
+
     @property  # lazy
     def project_api(self):
         if self._project_api is None:
+            project_api_class = self._get_project_api_implementation()
+
             # Looks like it's an issue, but technically it's not; this code runs in LMS, so 127.0.0.1 is always correct
             # location for API server, as it's basically executed in a neighbour thread/process/whatever.
             api_server = "http://127.0.0.1:8000"
             if hasattr(settings, 'API_LOOPBACK_ADDRESS'):
                 api_server = settings.API_LOOPBACK_ADDRESS
-            self._project_api = ProjectAPI(api_server)
+
+            self._project_api = project_api_class(api_server)
         return self._project_api
 
     @property
